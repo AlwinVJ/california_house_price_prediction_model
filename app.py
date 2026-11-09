@@ -31,6 +31,9 @@ if "theme" not in st.session_state:
 if "predicted_price" not in st.session_state:
     st.session_state.predicted_price = None
 
+if "last_predicted_inputs" not in st.session_state:
+    st.session_state.last_predicted_inputs = None
+
 if "prediction_error" not in st.session_state:
     st.session_state.prediction_error = None
 
@@ -60,7 +63,10 @@ if "val_median_income" not in st.session_state:
     st.session_state.val_median_income = 8.3252
 
 if "val_ocean_proximity" not in st.session_state:
-    st.session_state.val_ocean_proximity = "<1H OCEAN"
+    st.session_state.val_ocean_proximity = "INLAND"
+
+def on_ocean_change():
+    st.session_state.val_ocean_proximity = st.session_state.sel_ocean_proximity
 
 
 # ---------------------------------------------------------
@@ -82,7 +88,7 @@ model = load_model()
 is_dark = st.session_state.theme == "dark"
 
 if is_dark:
-    # DARK THEME PALETTE (Right half of reference image)
+    # DARK THEME PALETTE
     bg_app = "#090d16"
     bg_card = "#121824"
     bg_card_secondary = "#172033"
@@ -91,14 +97,16 @@ if is_dark:
     text_primary = "#f8fafc"
     text_secondary = "#cbd5e1"
     text_muted = "#8092aa"
+    header_subtitle_color = "#94a3b8"  # Muted light-gray
+    arrow_color = "#94a3b8"            # Light gray dropdown arrow
     text_icon = "#c084fc"
     accent_color = "#a855f7"
     accent_hover = "#9333ea"
     accent_light = "rgba(168, 85, 247, 0.12)"
     accent_glow = "rgba(168, 85, 247, 0.28)"
-    input_bg = "#1c2434"
-    input_border = "#2a374c"
-    input_text = "#f8fafc"
+    input_bg = "#1a2234"              # Dark gray/navy
+    input_border = "#2e3b52"          # Subtle gray/purple border
+    input_text = "#f8fafc"            # White text
     shadow_card = "0 4px 20px rgba(0, 0, 0, 0.45)"
     pred_card_bg = "linear-gradient(180deg, #1c1836 0%, #17152b 40%, #131422 70%, #2e1d4d 100%)"
     pred_card_border = "#372b54"
@@ -109,7 +117,7 @@ if is_dark:
     btn_gradient = "linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)"
     btn_hover = "linear-gradient(135deg, #6d28d9 0%, #7e22ce 100%)"
 else:
-    # LIGHT THEME PALETTE (Left half of reference image)
+    # LIGHT THEME PALETTE
     bg_app = "#f0f3f8"
     bg_card = "#ffffff"
     bg_card_secondary = "#f8fafc"
@@ -118,14 +126,16 @@ else:
     text_primary = "#0f172a"
     text_secondary = "#475569"
     text_muted = "#94a3b8"
+    header_subtitle_color = "#64748b"  # Muted blue-gray
+    arrow_color = "#334155"            # Dark gray/navy dropdown arrow
     text_icon = "#2563eb"
     accent_color = "#2563eb"
     accent_hover = "#1d4ed8"
     accent_light = "rgba(37, 99, 235, 0.08)"
     accent_glow = "rgba(37, 99, 235, 0.2)"
-    input_bg = "#f8fafc"
-    input_border = "#e2e8f0"
-    input_text = "#0f172a"
+    input_bg = "#ffffff"              # White / very light blue
+    input_border = "#cbd5e1"          # Subtle light blue/slate border
+    input_text = "#0f172a"            # Dark navy text
     shadow_card = "0 4px 20px rgba(0, 0, 0, 0.04)"
     pred_card_bg = "linear-gradient(180deg, #dbeafe 0%, #edf5ff 40%, #ffffff 75%, #dbeafe 100%)"
     pred_card_border = "#bfdbfe"
@@ -149,6 +159,8 @@ css_rules = f"""<style>
     --text-primary: {text_primary};
     --text-secondary: {text_secondary};
     --text-muted: {text_muted};
+    --header-subtitle-color: {header_subtitle_color};
+    --arrow-color: {arrow_color};
     --text-icon: {text_icon};
     --accent: {accent_color};
     --accent-hover: {accent_hover};
@@ -198,8 +210,8 @@ div[data-testid="stStatusWidget"] {{
 
 /* Desktop Viewport Optimization: No Vertical Scrolling */
 .block-container {{
-    padding-top: 0.35rem !important;
-    padding-bottom: 0.35rem !important;
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
     max-width: 1180px !important;
@@ -210,46 +222,76 @@ div[data-testid="stVerticalBlock"] > div {{
     gap: 0.22rem !important;
 }}
 
-/* Top Header Bar */
+/* Unified Primary Application Header */
 .top-header-bar {{
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0.15rem 0 0.35rem 0;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 0.35rem;
 }}
 
-.brand-wrapper {{
+.header-main-group {{
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 14px;
 }}
 
-.brand-icon {{
+.header-icon-box {{
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-primary);
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    min-height: 50px;
+    border-radius: 12px;
+    background: var(--accent-light);
+    color: var(--accent);
+    flex-shrink: 0;
 }}
 
-.brand-title {{
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--text-primary);
+.header-text-group {{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 3px;
 }}
 
-/* Theme Toggle Button in Header (Exact Square Pill from Reference Image) */
+.header-title {{
+    font-size: 30px !important;
+    font-weight: 800 !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.025em !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.2 !important;
+}}
+
+.header-title-accent {{
+    color: var(--accent) !important;
+}}
+
+.header-subtitle {{
+    font-size: 14.5px !important;
+    color: var(--header-subtitle-color) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-weight: 400 !important;
+    line-height: 1.35 !important;
+    letter-spacing: -0.01em !important;
+}}
+
+/* Theme Toggle Button in Header */
 div[data-testid="column"]:nth-child(2) button[kind="secondary"] {{
-    width: 36px !important;
-    height: 36px !important;
-    min-height: 36px !important;
-    border-radius: 9px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    border-radius: 10px !important;
     border: 1px solid var(--border-color) !important;
     background: var(--bg-card) !important;
     color: var(--text-primary) !important;
-    font-size: 1.1rem !important;
+    font-size: 1.15rem !important;
     padding: 0 !important;
     display: flex !important;
     align-items: center !important;
@@ -264,53 +306,44 @@ div[data-testid="column"]:nth-child(2) button[kind="secondary"]:hover {{
     transform: translateY(-1px);
 }}
 
-/* Hero Heading Section (Matching Reference Image) */
-.hero-heading-container {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.1rem 0 0.25rem 0;
-    margin-bottom: 0.3rem;
+/* Dashboard Two-Column Grid Equal Height */
+div[data-testid="stHorizontalBlock"] {{
+    align-items: stretch !important;
 }}
 
-.hero-text-group {{
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
+div[data-testid="column"] {{
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
 }}
 
-.hero-title {{
-    font-size: 1.55rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-    margin: 0 !important;
-    line-height: 1.2 !important;
-}}
-
-.hero-title-accent {{
-    color: var(--accent) !important;
-}}
-
-.hero-subtitle {{
-    font-size: 0.84rem;
-    color: var(--text-muted);
-    margin: 0 !important;
-}}
-
-.hero-illustration-box {{
-    display: flex;
-    align-items: center;
-    justify-content: center;
+div[data-testid="column"] > div[data-testid="stVerticalBlock"] {{
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    justify-content: stretch !important;
 }}
 
 /* Left Card: House Details Form Wrapper */
-div[data-testid="stVerticalBlockBorderWrapper"] {{
+div[data-testid="column"]:nth-child(1) div[data-testid="stVerticalBlockBorderWrapper"] {{
     background-color: var(--bg-card) !important;
     border: 1px solid var(--border-color) !important;
     border-radius: 16px !important;
     box-shadow: var(--shadow-card) !important;
-    padding: 0.95rem 1.15rem !important;
+    padding: 0.8rem 1.1rem 0.85rem 1.1rem !important;
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+}}
+
+div[data-testid="column"]:nth-child(1) div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {{
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    height: 100% !important;
+    gap: 0.16rem !important;
 }}
 
 /* Card Header Title */
@@ -318,8 +351,8 @@ div[data-testid="stVerticalBlockBorderWrapper"] {{
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.45rem;
-    padding-bottom: 0.3rem;
+    margin-bottom: 0.25rem;
+    padding-bottom: 0.15rem;
 }}
 
 .card-header-icon {{
@@ -344,7 +377,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] {{
     color: var(--text-secondary);
     white-space: nowrap;
     user-select: none;
-    height: 34px;
+    height: 35px;
 }}
 
 .param-icon {{
@@ -375,36 +408,36 @@ div[data-baseweb="base-input"] {{
     border-color: var(--input-border) !important;
 }}
 
-div[data-testid="stNumberInput"] div[data-baseweb="input"],
-div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
-    min-height: 32px !important;
-    height: 32px !important;
-    max-height: 32px !important;
-    border-radius: 7px !important;
+/* Number Input Styling (35px height for balanced layout) */
+div[data-testid="stNumberInput"] div[data-baseweb="base-input"],
+div[data-testid="stNumberInput"] div[data-baseweb="input"] {{
+    min-height: 35px !important;
+    height: 35px !important;
+    max-height: 35px !important;
+    border-radius: 8px !important;
     border: 1px solid var(--input-border) !important;
     background-color: var(--input-bg) !important;
     transition: all 0.2s ease !important;
 }}
 
-div[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within,
-div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div {{
+div[data-testid="stNumberInput"] div[data-baseweb="input"]:focus-within {{
     border-color: var(--border-focus) !important;
     box-shadow: 0 0 0 2px var(--accent-glow) !important;
 }}
 
 div[data-testid="stNumberInput"] input {{
     color: var(--input-text) !important;
-    font-size: 0.82rem !important;
+    font-size: 0.84rem !important;
     font-weight: 500 !important;
-    height: 30px !important;
-    padding: 0 0.5rem !important;
+    height: 33px !important;
+    padding: 0 0.6rem !important;
     background-color: transparent !important;
     text-align: left !important;
 }}
 
 div[data-testid="stNumberInput"] button {{
-    height: 30px !important;
-    width: 20px !important;
+    height: 33px !important;
+    width: 22px !important;
     color: var(--text-muted) !important;
     background: transparent !important;
     border: none !important;
@@ -414,15 +447,95 @@ div[data-testid="stNumberInput"] button:hover {{
     color: var(--accent) !important;
 }}
 
-div[data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p {{
-    color: var(--input-text) !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    line-height: 30px !important;
+/* Selectbox Dropdown Outer & Control Container */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] {{
+    border-radius: 8px !important;
 }}
 
-div[data-testid="stSelectbox"] svg {{
-    fill: var(--text-secondary) !important;
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+    min-height: 35px !important;
+    height: 35px !important;
+    max-height: 35px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--input-border) !important;
+    background-color: var(--input-bg) !important;
+    color: var(--input-text) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 0 0.65rem !important;
+    box-sizing: border-box !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}}
+
+div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div {{
+    border-color: var(--border-focus) !important;
+    box-shadow: 0 0 0 2px var(--accent-glow) !important;
+}}
+
+/* Value Container inside Selectbox - centered horizontally & vertically */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    flex: 1 1 auto !important;
+    padding: 0 0 0 18px !important; /* Optically centers text by balancing 18px arrow on right */
+    height: 100% !important;
+    overflow: hidden !important;
+}}
+
+/* Selected Value Text Node - high contrast, visible, uncompressed */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] [aria-selected="true"],
+div[data-testid="stSelectbox"] div[data-baseweb="select"] [class*="SingleValue"],
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child > div:first-child {{
+    color: var(--input-text) !important;
+    font-size: 0.84rem !important;
+    font-weight: 500 !important;
+    line-height: 35px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    flex-shrink: 0 !important; /* Prevents flexbox from collapsing text to 0 width */
+    margin: 0 auto !important;
+}}
+
+/* Search Input Container - collapse when not focused so it cannot push or obscure the selected text */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] [class*="InputContainer"],
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:first-child > div:nth-child(2) {{
+    width: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 0 !important;
+    overflow: hidden !important;
+}}
+
+div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within [class*="InputContainer"],
+div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within > div > div:first-child > div:nth-child(2) {{
+    width: auto !important;
+    flex: 1 1 auto !important;
+    overflow: visible !important;
+}}
+
+/* Arrow Container & Icon */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div:last-child {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 18px !important;
+    flex-shrink: 0 !important;
+}}
+
+div[data-testid="stSelectbox"] div[data-baseweb="select"] svg {{
+    fill: var(--arrow-color) !important;
+    color: var(--arrow-color) !important;
+    stroke: var(--arrow-color) !important;
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }}
 
 /* Dropdown Menu Popover Options Contrast */
@@ -433,34 +546,39 @@ ul[role="listbox"] {{
     border: 1px solid var(--border-color) !important;
     border-radius: 8px !important;
     box-shadow: var(--shadow-card) !important;
+    padding: 4px !important;
 }}
 
 li[role="option"] {{
     background-color: var(--bg-card) !important;
     color: var(--text-primary) !important;
-    font-size: 0.82rem !important;
+    font-size: 0.84rem !important;
+    border-radius: 6px !important;
+    padding: 0.45rem 0.75rem !important;
+    transition: all 0.15s ease !important;
 }}
 
 li[role="option"]:hover,
 li[role="option"][aria-selected="true"] {{
     background-color: var(--accent-light) !important;
     color: var(--accent) !important;
+    font-weight: 600 !important;
 }}
 
-/* Predict Button (Exact Full Width Button from Reference Image) */
+/* Predict Button */
 button[kind="primary"] {{
     background: var(--btn-gradient) !important;
     color: #ffffff !important;
     border: none !important;
     border-radius: 9px !important;
-    height: 40px !important;
-    min-height: 40px !important;
+    height: 38px !important;
+    min-height: 38px !important;
     font-size: 0.92rem !important;
     font-weight: 700 !important;
     letter-spacing: 0.01em !important;
     box-shadow: 0 2px 10px var(--accent-glow) !important;
     transition: all 0.2s ease !important;
-    margin-top: 0.5rem !important;
+    margin-top: 0.35rem !important;
 }}
 
 button[kind="primary"]:hover {{
@@ -469,19 +587,29 @@ button[kind="primary"]:hover {{
     transform: translateY(-1px);
 }}
 
-/* Right Card: Prediction Result Card (Matching Reference Image) */
+/* Right Column: Prediction container stretches to full height */
+div[data-testid="column"]:nth-child(2) > div[data-testid="stVerticalBlock"] > div,
+div[data-testid="column"]:nth-child(2) [data-testid="stMarkdownContainer"] {{
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+}}
+
+/* Right Card: Prediction Result Card (Matching Left Card Height) */
 .prediction-card-box {{
     background: var(--pred-card-bg);
     border: 1px solid var(--pred-card-border);
     border-radius: 16px;
-    padding: 1.4rem 1.2rem 0 1.2rem;
+    padding: 1.4rem 1.4rem 0 1.4rem;
     box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    min-height: 380px;
-    margin-bottom: 0.45rem;
+    height: 100% !important;
+    min-height: 435px;
+    box-sizing: border-box !important;
     position: relative;
     overflow: hidden;
 }}
@@ -490,22 +618,25 @@ button[kind="primary"]:hover {{
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
+    width: 66px;
+    height: 66px;
     border-radius: 50%;
     background: var(--pred-circle-bg);
     border: 1.5px solid var(--pred-circle-border);
     color: var(--accent);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-    margin-top: 0.5rem;
+    margin-top: 0.6rem;
+    flex-shrink: 0;
 }}
 
 .pred-center-group {{
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     text-align: center;
-    margin: 1.2rem 0 1rem 0;
+    flex: 1 1 auto;
+    margin: 0.8rem 0;
 }}
 
 .pred-label {{
@@ -516,98 +647,58 @@ button[kind="primary"]:hover {{
 }}
 
 .pred-price {{
-    font-size: 2.75rem;
+    font-size: 2.85rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1.1;
     color: var(--pred-val-color);
 }}
 
-.pred-price-placeholder {{
-    color: var(--text-muted);
-    font-size: 2.8rem;
-    font-weight: 700;
+.pred-status-badge {{
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    background: var(--accent-light);
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
 }}
 
-.pred-subtext {{
+.pred-status-dot {{
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}}
+
+.pred-status-text {{
     font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}}
+
+/* Awaiting Prediction Initial Empty State */
+.pred-awaiting-title {{
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--text-muted);
-    margin-top: 0.35rem;
+    margin-bottom: 0.35rem;
+    letter-spacing: -0.01em;
+}}
+
+.pred-awaiting-desc {{
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    max-width: 260px;
+    line-height: 1.45;
 }}
 
 .pred-bottom-wave {{
     width: 100%;
     margin-bottom: -4px;
     line-height: 0;
-}}
-
-/* Model Info Popover Button */
-div[data-testid="stPopover"] > button {{
-    height: 35px !important;
-    min-height: 35px !important;
-    border-radius: 9px !important;
-    border: 1px solid var(--border-color) !important;
-    background: var(--bg-card) !important;
-    color: var(--text-secondary) !important;
-    font-size: 0.83rem !important;
-    font-weight: 600 !important;
-    width: 100% !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
-    transition: all 0.2s ease !important;
-}}
-
-div[data-testid="stPopover"] > button:hover {{
-    color: var(--text-primary) !important;
-    border-color: var(--accent) !important;
-    background: var(--bg-card-secondary) !important;
-}}
-
-/* Popover Floating Body */
-div[data-testid="stPopoverBody"] {{
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 12px !important;
-    box-shadow: var(--shadow-card) !important;
-    padding: 0.85rem !important;
-    color: var(--text-primary) !important;
-    min-width: 270px !important;
-}}
-
-.popover-header {{
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.35rem;
-    border-bottom: 1px solid var(--border-color);
-}}
-
-.popover-title {{
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}}
-
-.popover-table {{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-}}
-
-.popover-table td {{
-    padding: 0.38rem 0.4rem;
-    border-bottom: 1px solid var(--border-color);
-}}
-
-.popover-key {{
-    font-weight: 600;
-    color: var(--text-secondary);
-}}
-
-.popover-val {{
-    font-weight: 500;
-    color: var(--text-primary);
-    text-align: right;
+    flex-shrink: 0;
 }}
 
 /* Responsive Media Queries */
@@ -615,11 +706,27 @@ div[data-testid="stPopoverBody"] {{
     .block-container {{
         padding: 0.75rem 0.9rem !important;
     }}
-    .hero-heading-container {{
-        flex-direction: row;
+    .header-main-group {{
+        gap: 10px;
+    }}
+    .header-title {{
+        font-size: 22px !important;
+    }}
+    .header-subtitle {{
+        font-size: 13px !important;
+    }}
+    .header-icon-box {{
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+    }}
+    div[data-testid="column"] {{
+        height: auto !important;
     }}
     .prediction-card-box {{
-        min-height: 280px;
+        min-height: 380px !important;
+        height: auto !important;
     }}
 }}
 </style>"""
@@ -628,20 +735,23 @@ st.markdown(css_rules, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
-# 1. Header Section: Brand and Theme Toggle (Matching Reference)
+# 1. Unified Primary Application Header (No Duplicate Heading)
 # ---------------------------------------------------------
 
-header_col1, header_col2 = st.columns([0.9, 0.1], vertical_alignment="center")
+header_col1, header_col2 = st.columns([0.88, 0.12], vertical_alignment="center")
 
 with header_col1:
-    header_html = """<div class="brand-wrapper">
-<div class="brand-icon">
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    header_html = """<div class="header-main-group">
+<div class="header-icon-box">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
 <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"></path>
 <polyline points="9 21 9 12 15 12 15 21"></polyline>
 </svg>
 </div>
-<span class="brand-title">House Price Prediction</span>
+<div class="header-text-group">
+<div class="header-title">House Price <span class="header-title-accent">Prediction</span></div>
+<div class="header-subtitle">Estimate house prices in California using a machine learning model.</div>
+</div>
 </div>"""
     st.markdown(header_html, unsafe_allow_html=True)
 
@@ -652,69 +762,11 @@ with header_col2:
         st.rerun()
 
 # Subtle Header Divider
-st.markdown('<div style="border-bottom: 1px solid var(--border-color); margin-bottom: 0.35rem;"></div>', unsafe_allow_html=True)
+st.markdown('<div style="border-bottom: 1px solid var(--border-color); margin-bottom: 0.6rem;"></div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
-# 2. Main Heading Section with Cozy House Illustration
-# ---------------------------------------------------------
-
-if is_dark:
-    # Nighttime house illustration for dark mode
-    illustration_svg = """<svg class="hero-illustration-svg" width="128" height="64" viewBox="0 0 128 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-<ellipse cx="64" cy="56" rx="58" ry="8" fill="#17142b"/>
-<circle cx="28" cy="42" r="14" fill="#241b3d"/>
-<circle cx="98" cy="38" r="16" fill="#211938"/>
-<circle cx="108" cy="44" r="12" fill="#291e45"/>
-<circle cx="20" cy="46" r="11" fill="#1d1633"/>
-<rect x="42" y="26" width="44" height="30" rx="2" fill="#2e264a"/>
-<path d="M38 27L64 8L90 27H38Z" fill="#1e1833" stroke="#544378" stroke-width="1.5" stroke-linejoin="round"/>
-<rect x="74" y="12" width="6" height="12" fill="#1e1833"/>
-<rect x="49" y="32" width="10" height="10" rx="1" fill="#fbbf24"/>
-<rect x="67" y="32" width="10" height="10" rx="1" fill="#fbbf24"/>
-<line x1="54" y1="32" x2="54" y2="42" stroke="#2e264a" stroke-width="1"/>
-<line x1="49" y1="37" x2="59" y2="37" stroke="#2e264a" stroke-width="1"/>
-<line x1="72" y1="32" x2="72" y2="42" stroke="#2e264a" stroke-width="1"/>
-<line x1="67" y1="37" x2="77" y2="37" stroke="#2e264a" stroke-width="1"/>
-<rect x="58" y="44" width="8" height="12" fill="#1a142e"/>
-<circle cx="88" cy="14" r="5" fill="#fef08a" opacity="0.6"/>
-</svg>"""
-else:
-    # Daytime house illustration for light mode
-    illustration_svg = """<svg class="hero-illustration-svg" width="128" height="64" viewBox="0 0 128 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-<ellipse cx="64" cy="56" rx="58" ry="8" fill="#e0f2fe"/>
-<circle cx="28" cy="42" r="14" fill="#6ee7b7"/>
-<circle cx="98" cy="38" r="16" fill="#34d399"/>
-<circle cx="108" cy="44" r="12" fill="#10b981"/>
-<circle cx="20" cy="46" r="11" fill="#059669"/>
-<rect x="42" y="26" width="44" height="30" rx="2" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
-<path d="M38 27L64 8L90 27H38Z" fill="#3b82f6" stroke="#2563eb" stroke-width="1.5" stroke-linejoin="round"/>
-<rect x="74" y="12" width="6" height="12" fill="#1e40af"/>
-<rect x="49" y="32" width="10" height="10" rx="1" fill="#bae6fd"/>
-<rect x="67" y="32" width="10" height="10" rx="1" fill="#bae6fd"/>
-<line x1="54" y1="32" x2="54" y2="42" stroke="#0284c7" stroke-width="1"/>
-<line x1="49" y1="37" x2="59" y2="37" stroke="#0284c7" stroke-width="1"/>
-<line x1="72" y1="32" x2="72" y2="42" stroke="#0284c7" stroke-width="1"/>
-<line x1="67" y1="37" x2="77" y2="37" stroke="#0284c7" stroke-width="1"/>
-<rect x="58" y="44" width="8" height="12" fill="#1e3a8a"/>
-<circle cx="104" cy="14" r="6" fill="#fef08a" opacity="0.8"/>
-</svg>"""
-
-hero_html = f"""<div class="hero-heading-container">
-<div class="hero-text-group">
-<h1 class="hero-title">House Price <span class="hero-title-accent">Prediction</span></h1>
-<p class="hero-subtitle">Estimate house prices in California using a machine learning model.</p>
-</div>
-<div class="hero-illustration-box">
-{illustration_svg}
-</div>
-</div>"""
-
-st.markdown(hero_html, unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------
-# 3. Two-Column Dashboard Layout
+# 2. Two-Column Dashboard Layout
 # ---------------------------------------------------------
 
 col_left, col_right = st.columns([1.18, 0.92], gap="medium")
@@ -952,13 +1004,12 @@ with col_left:
                 "NEAR BAY",
                 "NEAR OCEAN"
             ]
-            curr_ocean = st.session_state.val_ocean_proximity
-            ocean_idx = ocean_options.index(curr_ocean) if curr_ocean in ocean_options else 0
             ocean_proximity = st.selectbox(
                 "Ocean Proximity",
-                ocean_options,
-                index=ocean_idx,
+                options=ocean_options,
+                index=ocean_options.index(st.session_state.val_ocean_proximity),
                 key="sel_ocean_proximity",
+                on_change=on_ocean_change,
                 label_visibility="collapsed"
             )
             st.session_state.val_ocean_proximity = ocean_proximity
@@ -968,8 +1019,21 @@ with col_left:
 
 
 # ---------------------------------------------------------
-# Prediction Logic (Exact Backend ML Logic Preserved)
+# Prediction Logic & Stale State Tracking
 # ---------------------------------------------------------
+
+# Current state of the 9 inputs
+current_inputs = (
+    round(float(longitude), 4),
+    round(float(latitude), 4),
+    round(float(housing_median_age), 2),
+    round(float(total_rooms), 3),
+    round(float(total_bedrooms), 3),
+    round(float(population), 2),
+    round(float(households), 2),
+    round(float(median_income), 4),
+    str(ocean_proximity)
+)
 
 if predict_clicked:
     if ocean_proximity == "None" or ocean_proximity == "Select the proximity level from the drop down list":
@@ -996,32 +1060,25 @@ if predict_clicked:
         # Target is expressed in units of $100,000
         predicted_price = prediction * 100000
         st.session_state.predicted_price = predicted_price
+        st.session_state.last_predicted_inputs = current_inputs
         st.session_state.prediction_error = None
     except Exception as e:
         st.session_state.prediction_error = str(e)
         st.session_state.predicted_price = None
+        st.session_state.last_predicted_inputs = None
 
 
 # ---------------------------------------------------------
-# Right Column: Prediction Result Card & Model Info Popover
+# Right Column: Prediction Result Card (Clean, No Model Info)
 # ---------------------------------------------------------
 
 with col_right:
-    price_val = st.session_state.get("predicted_price", None)
+    # Check if prediction exists and matches currently entered inputs (no stale values)
+    is_valid_prediction = (
+        st.session_state.get("predicted_price") is not None
+        and st.session_state.get("last_predicted_inputs") == current_inputs
+    )
     err_val = st.session_state.get("prediction_error", None)
-
-    if price_val is not None:
-        price_display = f"${price_val:,.0f}"
-        price_class = "pred-price"
-        subtext_display = "Estimated Median Block Value"
-    elif err_val is not None:
-        price_display = "Error"
-        price_class = "pred-price-placeholder"
-        subtext_display = f"Error: {err_val}"
-    else:
-        price_display = "--"
-        price_class = "pred-price pred-price-placeholder"
-        subtext_display = "Click 'Predict House Price' to calculate."
 
     wave_svg = f"""<svg class="pred-bottom-wave" viewBox="0 0 320 80" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M0 45C60 20 120 60 180 35C240 10 280 40 320 25V80H0V45Z" fill="{pred_wave_color}" opacity="0.35"/>
@@ -1029,51 +1086,41 @@ with col_right:
 <path d="M0 65C90 45 180 75 270 55C295 50 310 58 320 54V80H0V65Z" fill="{pred_wave_color}" opacity="0.8"/>
 </svg>"""
 
-    house_badge_svg = """<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    house_badge_svg = """<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"></path>
 <polyline points="9 21 9 12 15 12 15 21"></polyline>
 </svg>"""
+
+    if is_valid_prediction:
+        # After Prediction: Prominent currency value & success status
+        price_val = st.session_state.predicted_price
+        price_display = f"${price_val:,.0f}"
+
+        center_content = f"""<div class="pred-label">Predicted House Price</div>
+<div class="pred-price">{price_display}</div>
+<div class="pred-status-badge">
+<span class="pred-status-dot"></span>
+<span class="pred-status-text">Prediction generated</span>
+</div>"""
+    elif err_val is not None:
+        # Error state
+        center_content = f"""<div class="pred-label">Predicted House Price</div>
+<div class="pred-awaiting-title" style="color: #ef4444;">Prediction Failed</div>
+<div class="pred-awaiting-desc">{err_val}</div>"""
+    else:
+        # Before Prediction (or inputs modified): Clean Awaiting Prediction Empty State
+        center_content = """<div class="pred-label">Predicted House Price</div>
+<div class="pred-awaiting-title">Awaiting Prediction</div>
+<div class="pred-awaiting-desc">Your estimated house price will appear here after you submit the house details.</div>"""
 
     pred_card_html = f"""<div class="prediction-card-box">
 <div class="pred-circle-icon">
 {house_badge_svg}
 </div>
 <div class="pred-center-group">
-<div class="pred-label">Predicted House Price</div>
-<div class="{price_class}">{price_display}</div>
-<div class="pred-subtext">{subtext_display}</div>
+{center_content}
 </div>
 {wave_svg}
 </div>"""
 
     st.markdown(pred_card_html, unsafe_allow_html=True)
-
-    # Model Info Popover (Streamlit native popover)
-    with st.popover("📊  Model Info", use_container_width=True):
-        popover_html = """<div class="popover-wrapper">
-<div class="popover-header">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<line x1="18" y1="20" x2="18" y2="10"></line>
-<line x1="12" y1="20" x2="12" y2="4"></line>
-<line x1="6" y1="20" x2="6" y2="14"></line>
-</svg>
-<span class="popover-title">Model Info</span>
-</div>
-<table class="popover-table">
-<tbody>
-<tr>
-<td class="popover-key">Model</td>
-<td class="popover-val">Ridge Regression</td>
-</tr>
-<tr>
-<td class="popover-key">Dataset</td>
-<td class="popover-val">California Housing</td>
-</tr>
-<tr>
-<td class="popover-key">Target</td>
-<td class="popover-val">Median House Value</td>
-</tr>
-</tbody>
-</table>
-</div>"""
-        st.markdown(popover_html, unsafe_allow_html=True)
